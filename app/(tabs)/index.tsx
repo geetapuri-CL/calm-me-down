@@ -6,6 +6,8 @@ import { FitbitAuth } from '@/components/FitbitAuth';
 import { HeartRateTable } from '@/components/HeartRateTable';
 import { ScrollView } from 'react-native';
 import { UserPrompts} from '@/components/UserPrompts';
+import { LocationService } from '@/components/LocationService';
+import * as Location from 'expo-location';
 
 const PPLX_API_KEY= process.env.EXPO_PUBLIC_PPLX_API_KEY;
 
@@ -20,6 +22,8 @@ export default function HomeScreen() {
   const [HRsample, setHRsample] = useState(0);
   const [showHeartRateData, setShowHeartRateData] = useState(false);
   const [stepsData, setStepsData] = useState<any[]>([])
+  const [locationData, setLocationData] = useState<Location.LocationObject | null>(null);
+
 
   // Reset all app state
   const resetAppState = useCallback(() => {
@@ -33,6 +37,7 @@ export default function HomeScreen() {
     setAnalyzing(false);
     setLlmResponse('');
     setHRsample(0);
+    setLocationData(null);
   }, []);
 
    // Reset data on Home tab focus
@@ -151,15 +156,24 @@ export default function HomeScreen() {
     console.log('Resting HR sample:', heartRateData[0].value.restingHeartRate);
 
   }
-    const analyzeHealthDataWithLLM = useCallback(async () => {
+  const analyzeHealthDataWithLLM = useCallback(async () => {
       if (!heartRateData?.length || !stepsData?.length || !userData) {
         setError('No health data or user data to analyze.');
         return;
-      }
+  }
 
       const sampleHR = heartRateData[0].value.restingHeartRate;
       const sampleSteps = stepsData[0].value;
       setHRsample(sampleHR);
+
+      const locationStr = locationData ?
+        `My current location is Lat: ${locationData.coords.latitude.toFixed(4)}, Lng: ${locationData.coords.longitude.toFixed(4)}.` :
+        'Location data not available.';
+
+      console.log('Analyzing health data with LLM...');
+      console.log(`Using health data: ${sampleHR} BPM, ${sampleSteps.toLocaleString()} steps`);
+      console.log('User data:', userData);
+      console.log(locationStr);
 
     setError(null);
     setAnalyzing(true);
@@ -170,6 +184,7 @@ export default function HomeScreen() {
 Current Health Status:
 - Heart Rate: ${sampleHR} BPM
 - Steps Today: ${sampleSteps.toLocaleString()} steps
+${locationStr}
 
 Emotional Journey:
 - Current Mood: ${userData.currentMood}
@@ -215,14 +230,37 @@ Please generate personalized, meaningful lyrics for a song that will help me tra
       setAnalyzing(false);
       console.log('Analysis complete');
     }
-  }, [heartRateData, stepsData, userData]);
+  }, [heartRateData, stepsData, userData, locationData]);
 
+  const handleLocationChange = (location: Location.LocationObject) => {
+    console.log('Location updated:', location);
+    setLocationData(location);
+  } 
+
+  
   return (
     <ScrollView style={styles.container}
       contentContainerStyle={{ padding: 6, paddingBottom: 48 }}
       keyboardShouldPersistTaps="handled">
 
       {/* Step 1: User Prompts */}
+      
+      {/*Add location service*/}
+      
+      {userData && (
+        <View style={styles.stepContainer}>
+          <Text style={styles.stepTitle}>Your Location </Text>
+          <LocationService onLocationChange={handleLocationChange} />
+
+          {locationData && (
+            <Text style={styles.infoText}>
+              Lat: {locationData.coords.latitude.toFixed(4)},
+              Lng: {locationData.coords.longitude.toFixed(4)}
+            </Text>
+          )}
+        </View>
+      )}
+
       {!userData && (
         <UserPrompts onSubmit={(name, age, currentMood, desiredMood) => {
           console.log(`User Info - Name: ${name}, Age: ${age}, CurrentMood: ${currentMood}, DesiredMood: ${desiredMood}`);
