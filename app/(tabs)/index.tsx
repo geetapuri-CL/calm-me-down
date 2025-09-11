@@ -7,7 +7,7 @@ import { HeartRateTable } from '@/components/HeartRateTable';
 import { ScrollView } from 'react-native';
 import { UserPrompts} from '@/components/UserPrompts';
 
-const PPLX_API_KEY= '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';
+const PPLX_API_KEY= process.env.EXPO_PUBLIC_PPLX_API_KEY;
 
 export default function HomeScreen() {
   const [userData, setUserData] = useState<{name: string, age: string, currentMood: string | null, desiredMood: string | null} | null>(null);

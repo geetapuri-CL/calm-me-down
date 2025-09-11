@@ -4,7 +4,7 @@ import * as AuthSession from 'expo-auth-session';
 import { Button, Text, View } from 'react-native';
 
 const CLIENT_ID = '23QLP5';
-const CLIENT_SECRET = 'e0c4f9230a61bc49cea80071b8d45a45'; // You need to add your client secret here
+const CLIENT_SECRET = process.env.EXPO_PUBLIC_FITBIT_CLIENT_SECRET; // You need to add your client secret here
 const SCOPES = ['heartrate', 'activity', 'profile', 'sleep', 'weight', 'nutrition', 'settings'];
 const DISCOVERY = {
   authorizationEndpoint: 'https://www.fitbit.com/oauth2/authorize',
