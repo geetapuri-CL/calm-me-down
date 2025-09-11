@@ -1,0 +1,166 @@
+import { useFocusEffect } from '@react-navigation/native';
+import React, { useState, useCallback } from 'react';
+import { View, TouchableOpacity, StyleSheet, Text, Button } from 'react-native';
+import { FontAwesome } from '@expo/vector-icons';
+import { FitbitAuth } from '@/components/FitbitAuth';
+import { HeartRateTable } from '@/components/HeartRateTable';
+import { ScrollView } from 'react-native';
+
+const PPLX_API_KEY= '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';
+
+export default function HomeScreen() {
+  const [token, setToken] = useState<string | null>(null);
+  const [heartRateData, setHeartRateData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [llmResponse, setLlmResponse] = useState('xxxxyy');
+  const [HRsample, setHRsample] = useState(0);
+  const [showHeartRateData, setShowHeartRateData] = useState(false); // New state variable
+
+   // Reset data on Home tab focus
+  useFocusEffect(
+    useCallback(() => {
+      console.log ('Home tab focused, resetting data');
+      setShowHeartRateData(false);
+      setHeartRateData([]);
+      setError(null);
+      setLoading(false);
+
+      return () => {
+        console.log('Home tab unfocused');
+      }
+    }, [])
+  );
+
+  const fetchHeartRate = async () => {
+    if (!token) return;
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const res = await fetch(
+        'https://api.fitbit.com/1/user/-/activities/heart/date/today/1d.json',
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      if (!res.ok) throw new Error('Failed to fetch');
+
+      const fitbitHRData = await res.json();
+      console.log('Fetched fitbit data:', JSON.stringify(fitbitHRData));
+      fitbitHRData['activities-heart']?.forEach((entry: any) => {
+        console.log(`Date: ${entry.dateTime}, Resting HR: ${entry.value.restingHeartRate}`);
+        entry.value.restingHeartRate = 120;
+      });
+
+      setHeartRateData(fitbitHRData['activities-heart'] || []);
+      console.log("Heart rate data length after setHeartRateData:", heartRateData.length);
+      setShowHeartRateData(true); // Show the table after fetching data
+      
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const displayAnalyseStats = () => {
+    console.log('Displaying analysis stats');
+    console.log('Heart rate data length:', heartRateData.length);
+    console.log('Heart rate data sample:', JSON.stringify(heartRateData.slice(0, 1)));
+    console.log('Resting HR sample:', heartRateData[0]?.value?.restingHeartRate);
+    console.log('Resting HR sample:', heartRateData[0].value.restingHeartRate);
+
+  }
+    const analyzeHeartRateWithLLM = useCallback(async () => {
+      if (!heartRateData?.length) {
+        setError('No heart rate data to analyze.');
+        return;
+      }
+
+      const sampleHR = heartRateData[0].value.restingHeartRate;
+      setHRsample(sampleHR);
+
+    setError(null);
+    setAnalyzing(true);
+
+    try {
+      const json_pplx = {
+        "model": "sonar-pro",
+        "messages": [
+          {"role": "user", "content": "My heart rate is " + sampleHR + ". Can you generate lyrics for a song about it so that I can feel calmer?"}
+        ],
+        "max_tokens": 150,
+        "temperature": 0.8
+      }
+
+      const resp = await fetch(
+        'https://api.perplexity.ai/chat/completions',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${PPLX_API_KEY}`
+          },
+          body: JSON.stringify(json_pplx)
+        }
+      );
+      
+      const respJson = await resp.json();
+
+      // Extract the lyrics output (usually here)
+      const lyrics = respJson.choices?.[0]?.message?.content;
+      //console.log('Generated Lyrics:', lyrics);
+
+      // Read body ONCE, then branch.
+      //const raw = await resp.text();
+
+      const output = lyrics ;
+
+      setLlmResponse(output || 'No response from model.');
+      console.log('LLM response:', output);
+    } catch (e: any) {
+      console.log('Error during LLM analysis:', e);
+      setError(e.message || String(e));
+    } finally {
+      setAnalyzing(false);
+      console.log('Analysis complete');
+    }
+  }, [heartRateData]);
+
+  return (
+    <ScrollView style={styles.container}
+      contentContainerStyle={{ padding: 6, paddingBottom: 48 }} // Add extra space at bottom
+      keyboardShouldPersistTaps="handled">
+
+      <FitbitAuth onTokenChange={setToken} token={token} />
+
+      <TouchableOpacity style={styles.iconButton} onPress={fetchHeartRate} disabled={!token || loading || analyzing}>
+        <FontAwesome name="heart" size={64} color={token ? 'red' : 'grey'} />
+      </TouchableOpacity>
+
+      {loading && <Text>Loading heart rate data...</Text>}
+      {error && <Text style={{ color: 'red' }}>{error}</Text>}
+
+      {showHeartRateData && heartRateData.length > 0 && <HeartRateTable data={heartRateData} />}
+
+      <Button
+        title={analyzing ? 'Analyzing…' : 'Analyze with LLM'}
+        onPress={analyzeHeartRateWithLLM}
+        //onPress={displayAnalyseStats}
+        disabled={heartRateData.length === 0 || analyzing || loading}
+      />
+
+      {analyzing && <Text>Analyzing with LLM...</Text>}
+      {!!HRsample && <Text style={{ marginTop: 12, color: 'white' }}>Heart Rate Sample being used for lyrics generation: {HRsample}</Text>}
+      {!!llmResponse && <Text style={{ marginTop: 12, color: 'white' }}>{llmResponse}</Text>}
+    </ScrollView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, padding: 20, backgroundColor: '#121212' },
+  iconButton: { alignItems: 'center', marginVertical: 20 },
+});

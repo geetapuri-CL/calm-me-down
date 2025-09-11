@@ -1,0 +1,96 @@
+import React, { useState, useEffect } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as AuthSession from 'expo-auth-session';
+import { Button, Text, View } from 'react-native';
+import { Platform } from 'react-native';
+
+
+const CLIENT_ID = '23QLP5';
+const SCOPES = ['heartrate', 'profile', 'activity', 'sleep', 'weight'];
+const DISCOVERY = {
+  authorizationEndpoint: 'https://www.fitbit.com/oauth2/authorize',
+  tokenEndpoint: 'https://api.fitbit.com/oauth2/token',
+};
+const TOKEN_KEY = 'fitbitAccessToken';
+
+export function FitbitAuth({ onTokenChange, token }: { onTokenChange: (token: string | null) => void, token: string | null }) {
+  //const [token, setToken] = useState<string | null>(null);
+  const [authActive, setAuthActive] = useState(false);
+  const redirectUri = 
+    Platform.OS === 'web'
+    ? 'https://5b17eff8ed77.ngrok-free.app'
+    : AuthSession.makeRedirectUri();
+
+  const config = {
+    clientId: CLIENT_ID,
+    scopes: SCOPES,
+    redirectUri,
+    responseType: AuthSession.ResponseType.Token,
+  };
+
+  const [request, response, promptAsync] = AuthSession.useAuthRequest(config, DISCOVERY);
+
+  useEffect(() => {
+    (async () => {
+      const savedToken = await AsyncStorage.getItem(TOKEN_KEY);
+      if (savedToken) {
+        //setToken(savedToken);
+        onTokenChange(savedToken);
+      } else {
+        onTokenChange(null);
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (response?.type === 'success') {
+      const accessToken = response.params.access_token;
+      if (accessToken) {
+        AsyncStorage.setItem(TOKEN_KEY, accessToken);
+        //setToken(accessToken);
+        onTokenChange(accessToken);
+      }
+    }
+  }, [response]);
+
+  useEffect(() => {
+    if (Platform.OS === 'web'){
+      // Set hash to empty to avoid OAuth redirect issues on web
+      const hash = window.location.hash;
+      if (hash && hash.includes('access_token')) {
+        const params = new URLSearchParams(hash.slice(1));
+        const accessToken = params.get('access_token');
+        if (accessToken) {
+          AsyncStorage.setItem(TOKEN_KEY, accessToken);
+          //setToken(accessToken);
+          onTokenChange(accessToken);
+          
+        }
+    }
+  }
+  }, []);
+
+  const logout = async () => {
+    await AsyncStorage.removeItem(TOKEN_KEY);
+    //setToken(null);
+    onTokenChange(null);
+  };
+
+  return (
+    <View style={{ marginVertical: 20 }}>
+      {token ? (
+        <>
+          <Text style={{ marginBottom: 10, color: 'white' }}>Logged in to Fitbit</Text>
+          <Button title="Logout" onPress={logout} />
+        </>
+      ) : (
+        <Button disabled={!request} title="Authorize Fitbit" onPress={async () => {
+            setAuthActive(true);
+            await promptAsync();
+            setAuthActive(false);
+            }} 
+        />
+      )}
+    </View>
+  );
+}

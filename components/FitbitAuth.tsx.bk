@@ -1,0 +1,143 @@
+// /components/FitbitAuth.tsx
+import React, { useState, useEffect } from 'react';
+import { Button, Text, View } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as AuthSession from 'expo-auth-session';
+
+
+const CLIENT_ID = '23QLP5'; // Replace with your Fitbit app client ID
+const SCOPES = ['heartrate', 'activity', 'profile', 'sleep'];
+const DISCOVERY = {
+  authorizationEndpoint: 'https://www.fitbit.com/oauth2/authorize',
+  tokenEndpoint: 'https://api.fitbit.com/oauth2/token',
+};
+
+const TOKEN_KEY = 'fitbitAccessToken';
+
+export default function FitbitAuth() {
+  const [token, setToken] = useState<string | null>(null);
+  const [heartRate, setHeartRate] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
+
+
+  // Generate redirect URI automatically
+  const redirectUri = AuthSession.makeRedirectUri();
+
+  const config = {
+    clientId: CLIENT_ID,
+    scopes: SCOPES,
+    redirectUri,
+    responseType: AuthSession.ResponseType.Token,
+  };
+
+  // Load saved token from AsyncStorage on mount
+  useEffect(() => {
+    (async () => {
+      const savedToken = await AsyncStorage.getItem(TOKEN_KEY);
+      if (savedToken) {
+        setToken(savedToken);
+      }
+    })();
+  }, []);
+
+  // Create Auth Request hook
+  const [request, response, promptAsync] = AuthSession.useAuthRequest(config, DISCOVERY);
+
+  // Save token on successful authentication
+  useEffect(() => {
+    console.log('Auth Response:', response);
+    if (response?.type === 'success') {
+      const accessToken = response.params.access_token;
+      if (accessToken) {
+        AsyncStorage.setItem(TOKEN_KEY, accessToken);
+        setToken(accessToken);
+      }
+    }
+  }, [response]);
+
+
+
+    // Fetch heart rate data when token changes
+  useEffect(() => {
+    const fetchHeartRate = async () => {
+      setError(null);
+      setHeartRate(null);
+      if (!token) return;
+
+      try {
+        console.log('Fetching heart rate data with token:', token);
+        const res = await fetch(
+          'https://api.fitbit.com/1/user/-/activities/heart/date/today/1d.json',
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+        console.log("Fetch response status:", res.status);
+
+        if (!res.ok) {
+          throw new Error(`Error fetching heart rate: ${res.statusText}`);
+        }
+        const data = await res.json();
+        console.log('Heart Rate API response Data:', data);
+        console.log('Full Heart Rate Data:', JSON.stringify(data, null, 2));
+        setHeartRate(data['activities-heart']);
+      } catch (err: any) {
+        console.error('Error fetching heart rate data:', err);
+        setError(err.message || 'Error fetching heart rate data');
+      }
+    };
+
+    fetchHeartRate();
+  }, [token]);
+
+    // Optional: Add a logout function to clear token
+  const logout = async () => {
+    await AsyncStorage.removeItem(TOKEN_KEY);
+    setToken(null);
+    setHeartRate(null);
+    setError(null);
+  };
+
+  return (
+    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+      {token ? (
+        <>
+            <Text style={{ marginBottom: 20, fontWeight: 'bold', color: 'white' }}>Access Token:</Text>
+            <Text style={{ marginBottom: 20, fontSize: 12, color: 'yellow' }}>{token}</Text>
+            
+            {error && (
+                <Text style={{ color: 'red', marginBottom: 20 }}>{error}</Text>
+            )}
+
+            {heartRate ? (
+                heartRate.map((entry: any, index: number) => (
+                    <View key={index} style={{ marginBottom: 10, alignItems: 'center' }}>
+                        <Text style = {{color:'white'}}>Date: {entry.dateTime}</Text>
+                        <Text style = {{color:'white'}}>Resting Heart Rate: {entry.value.restingHeartRate ?? 'N/A'}</Text>
+                        <Text style = {{color:'white'}}>Heart Rate Zones:</Text>
+                        {entry.value.heartRateZones?.map((zone: any, zIndex: number) => (
+                            <Text style = {{color:'white'}}key={zIndex}> - {zone.name}:{zone.min} - { zone.max} bpm
+                        </Text>
+                        ))}
+                        
+                    </View>
+                ))
+            ) : (
+                <Text> Loading heart rate data...</Text>
+            )}
+
+            <Text style={{ marginBottom: 20, color: 'white' }}>Access Token: {token}</Text>
+            <Button title="Logout" onPress={logout} />
+        </>
+      ) : (
+        <Button
+          disabled={!request}
+          title="Authorize Fitbit"
+          onPress={() => promptAsync()}
+        />
+      )}
+    </View>
+  );
+}
