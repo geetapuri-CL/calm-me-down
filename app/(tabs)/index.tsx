@@ -37,13 +37,14 @@ export default function HomeScreen() {
     setAnalyzing(false);
     setLlmResponse('');
     setHRsample(0);
-    setLocationData(null);
+    // Don't reset location data - keep it persistent
+    // setLocationData(null);
   }, []);
 
-   // Reset data on Home tab focus
+   // Reset data on Home tab focus - always reset when switching to home tab
   useFocusEffect(
     useCallback(() => {
-      console.log ('Home tab focused, resetting data');
+      console.log ('Home tab focused, resetting to initial state');
       resetAppState();
 
       return () => {
@@ -236,7 +237,12 @@ Keep the lyrics concise, around 200 words, and ensure they flow well together. A
   const handleLocationChange = (location: Location.LocationObject) => {
     console.log('Location updated:', location);
     setLocationData(location);
-  } 
+  }
+
+  // Debug: Log when location data changes
+  React.useEffect(() => {
+    console.log('Location data state changed:', locationData);
+  }, [locationData]); 
 
   
   return (
@@ -244,29 +250,26 @@ Keep the lyrics concise, around 200 words, and ensure they flow well together. A
       contentContainerStyle={{ padding: 6, paddingBottom: 48 }}
       keyboardShouldPersistTaps="handled">
 
+      {/* Location Service - Always active */}
+      <LocationService onLocationChange={handleLocationChange} />
+
       {/* Step 1: User Prompts */}
-      
-      {/*Add location service*/}
-      
-      {userData && (
-        <View style={styles.stepContainer}>
-          <Text style={styles.stepTitle}>Your Location</Text>
-          <LocationService onLocationChange={handleLocationChange} />
-
-          {locationData && (
-            <Text style={styles.infoText}>
-              Lat: {locationData.coords.latitude.toFixed(4)},
-              Lng: {locationData.coords.longitude.toFixed(4)}
-            </Text>
-          )}
-        </View>
-      )}
-
       {!userData && (
         <UserPrompts onSubmit={(name, age, currentMood, desiredMood) => {
           console.log(`User Info - Name: ${name}, Age: ${age}, CurrentMood: ${currentMood}, DesiredMood: ${desiredMood}`);
           setUserData({ name, age, currentMood, desiredMood });
         }} />
+      )}
+
+      {/* Location Display - Only show after user data */}
+      {userData && locationData && (
+        <View style={styles.stepContainer}>
+          <Text style={styles.stepTitle}>Your Location</Text>
+          <Text style={styles.infoText}>
+            Lat: {locationData.coords.latitude.toFixed(4)},
+            Lng: {locationData.coords.longitude.toFixed(4)}
+          </Text>
+        </View>
       )}
 
       {/* Step 2: Fitbit Auth & Data Collection */}
@@ -319,7 +322,7 @@ Keep the lyrics concise, around 200 words, and ensure they flow well together. A
           <Text style={styles.stepTitle}>Step 4: Generate Personalized Lyrics</Text>
           <Button
             title={analyzing ? 'Generating Lyrics…' : 'Generate Lyrics'}
-            onPress={analyzeHealthDataWithLLM} //uncomment this to call 
+            //onPress={analyzeHealthDataWithLLM} //uncomment this to call , comment so you dont waste money :D
             disabled={analyzing || loading}
           />
         </View>

@@ -14,6 +14,14 @@ export const UserPrompts: React.FC<UserPromptsProps> = ({ onSubmit }) => {
   const moodTags = ['happy', 'sad', 'energetic', 'tired', 'stressed', 'relaxed', 'anxious', 'motivated', 'bored', 'excited'];
   const [currentMood, setCurrentMood] = useState<string | null>(null);
   const [desiredMood, setDesiredMood] = useState<string | null>(null);
+  const [isFormValid, setIsFormValid] = useState(false);
+
+  // Update form validity when any field changes
+  useEffect(() => {
+    const valid = !!(name && age && currentMood && desiredMood);
+    setIsFormValid(valid);
+    console.log('Form state changed:', {name, age, currentMood, desiredMood, disabled: !valid, isFormValid: valid});
+  }, [name, age, currentMood, desiredMood]);
   return (
     <View style={styles.container}>
       <Text style={styles.label}>Name:</Text>
@@ -40,7 +48,10 @@ export const UserPrompts: React.FC<UserPromptsProps> = ({ onSubmit }) => {
               styles.tag,
               currentMood === tag && styles.selectedTag
             ]}
-            onPress={() => setCurrentMood(tag)}
+            onPress={() => {
+              console.log('Current mood selected:', tag);
+              setCurrentMood(tag);
+            }}
           >
           <Text>{tag}</Text>
           </TouchableOpacity>
@@ -55,18 +66,30 @@ export const UserPrompts: React.FC<UserPromptsProps> = ({ onSubmit }) => {
               styles.tag,
               desiredMood === tag && styles.selectedTag
             ]}
-            onPress={() => setDesiredMood(tag)}
+            onPress={() => {
+              console.log('Desired mood selected:', tag);
+              setDesiredMood(tag);
+            }}
           >
           <Text>{tag}</Text>
           </TouchableOpacity>
         ))}
       </View>
       
-      <Button
-        title="Submit"
-        onPress={() => onSubmit(name, age, currentMood, desiredMood)}
-        disabled={!name || !age || !currentMood || !desiredMood}
-      />
+      <TouchableOpacity
+        style={[
+          styles.submitButton,
+          { backgroundColor: isFormValid ? "#007AFF" : "#666" }
+        ]}
+        onPress={() => isFormValid && onSubmit(name, age, currentMood, desiredMood)}
+        disabled={!isFormValid}
+      >
+        <Text style={styles.submitButtonText}>Submit</Text>
+      </TouchableOpacity>
+      {/* Debug info */}
+      {/* <Text style={{color: 'red', fontSize: 14, marginTop: 10, backgroundColor: 'yellow', padding: 5}}>
+        DEBUG: name={name ? '✓' : '✗'}, age={age ? '✓' : '✗'}, currentMood={currentMood ? '✓' : '✗'}, desiredMood={desiredMood ? '✓' : '✗'}
+      </Text> */}
     </View>
   );
 };
@@ -116,5 +139,18 @@ const styles = StyleSheet.create({
   selectedTag: {
     backgroundColor: '#e0f2ff',
     borderColor: '#36a2ef',
+  },
+  submitButton: {
+    backgroundColor: '#007AFF',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  submitButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
