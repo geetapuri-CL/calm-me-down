@@ -184,13 +184,14 @@ export default function HomeScreen() {
 Current Health Status:
 - Heart Rate: ${sampleHR} BPM
 - Steps Today: ${sampleSteps.toLocaleString()} steps
-${locationStr}
+- Location: ${locationStr}
 
 Emotional Journey:
 - Current Mood: ${userData.currentMood}
 - Desired Mood: ${userData.desiredMood}
 
-Please generate personalized, meaningful lyrics for a song that will help me transition from feeling ${userData.currentMood} to feeling ${userData.desiredMood}. Consider my health statistics (heart rate and activity level) when crafting the lyrics. The song should be motivational and therapeutic, helping me reach my desired emotional state through music. Make it personal and relatable to my current physical and emotional state.`;
+Please generate personalized, meaningful lyrics for a song that will help me transition from feeling ${userData.currentMood} to feeling ${userData.desiredMood}. Consider my health statistics (heart rate and activity level) when crafting the lyrics. The song should be motivational and therapeutic, helping me reach my desired emotional state through music. Make it personal and relatable to my current physical and emotional state. 
+Keep the lyrics concise, around 200 words, and ensure they flow well together. Avoid generic phrases and focus on creating a unique piece that resonates with my situation and location. Thank you!`;
 
       const json_pplx = {
         "model": "sonar-pro",
@@ -249,7 +250,7 @@ Please generate personalized, meaningful lyrics for a song that will help me tra
       
       {userData && (
         <View style={styles.stepContainer}>
-          <Text style={styles.stepTitle}>Your Location </Text>
+          <Text style={styles.stepTitle}>Your Location</Text>
           <LocationService onLocationChange={handleLocationChange} />
 
           {locationData && (
@@ -318,7 +319,7 @@ Please generate personalized, meaningful lyrics for a song that will help me tra
           <Text style={styles.stepTitle}>Step 4: Generate Personalized Lyrics</Text>
           <Button
             title={analyzing ? 'Generating Lyrics…' : 'Generate Lyrics'}
-            //onPress={analyzeHealthDataWithLLM} //uncomment this to call 
+            onPress={analyzeHealthDataWithLLM} //uncomment this to call 
             disabled={analyzing || loading}
           />
         </View>
