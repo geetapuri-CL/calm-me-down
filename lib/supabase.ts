@@ -15,7 +15,8 @@ export interface User {
 
 export interface HealthSession {
   id: string;
-  user_id: string;
+  user_name: string;
+  user_age: number;
   heart_rate: number;
   steps: number;
   location_lat?: number;
@@ -82,9 +83,7 @@ export class DatabaseService {
         sessionId: string,
         promptUsed: string,
         generatedLyrics: string,
-        modelUsed: string = 'sonar-pro',
-        
-    ) {
+        modelUsed: string = 'sonar-pro') {
         const { data, error } = await supabase
             .from('therapy_responses')
             .insert({
@@ -102,5 +101,40 @@ export class DatabaseService {
         }
 
         return data;
+    }
+
+    async getAllHealthSessions(): Promise<HealthSession[]>{
+        console.log ('Fetching all health sessions...')
+
+        const { data, error } = await supabase
+            .from ('health_sessions')
+            .select('*')
+            .order('session_date', { ascending:false});
+
+        if (error) {
+            console.log ("Error fetching health sessions", error);
+            throw error;
+        }
+
+        console.log('fetched ${data?.length || 0} health sessions');
+        return data || [];
+    }
+
+      // Get sessions with therapy responses (for future use)
+    async getSessionsWithResponses(): Promise<any[]> {
+        const { data, error } = await supabase
+        .from('health_sessions')
+        .select(`
+            *,
+            therapy_responses (*)
+        `)
+        .order('session_date', { ascending: false });
+        
+        if (error) {
+        console.error('Error fetching sessions with responses:', error);
+        throw error;
+        }
+        
+        return data || [];
     }
 }
