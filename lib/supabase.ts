@@ -1,17 +1,9 @@
 import { createClient } from '@supabase/supabase-js';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    storage: AsyncStorage,
-    autoRefreshToken: true,
-    persistSession: true,
-    detectSessionInUrl: false,
-  },
-});
+export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 // Health specific types
 export interface User {
@@ -27,7 +19,7 @@ export interface HealthSession {
   heart_rate: number;
   steps: number;
   location_lat?: number;
-  location_lon?: number;
+  location_lng?: number;
   current_mood: string;
   desired_mood: string;
   session_date: string;
@@ -44,61 +36,37 @@ export interface TherapyResponse {
 }
 
 export class DatabaseService {
-    // User management
-    async createOrUpdateUser(userData: { name: string; age: number }): Promise<User | null> {
-        const { data: { user } } = await supabase.auth.getUser();
-        
-        if (!user) {
-            throw new Error('User not authenticated');
-        }
 
-        const { data, error } = await supabase
-            .from('users')
-            .upsert({
-                id: user.id,
-                name: userData.name,
-                age: userData.age,
-            })
-            .select()
-            .single();
-
-        if (error) {
-            console.error('Error creating/updating user:', error);
-            throw error;
-        }
-
-        return data;
-    }
 
     // Health session management
     async saveHealthSession(sessionData: {
+        userName: string;
         heartRate: number;
         steps: number;
         locationLat?: number;
-        locationLon?: number;
+        locationLng?: number;
         currentMood: string;
         desiredMood: string;
-    }): Promise<HealthSession | null> {
-        const { data: { user } } = await supabase.auth.getUser();
+    }): Promise<any> {
+        console.log('Attempting to save health session:', sessionData);
         
-        if (!user) {
-            throw new Error('User not authenticated');
-        }
-
         const { data, error } = await supabase
             .from('health_sessions')
             .insert({
-                user_id: user.id,
+                user_id: sessionData.userName,
                 heart_rate: sessionData.heartRate,
                 steps: sessionData.steps,
                 location_lat: sessionData.locationLat,
-                location_lon: sessionData.locationLon,
+                location_lng: sessionData.locationLng,
                 current_mood: sessionData.currentMood,
                 desired_mood: sessionData.desiredMood,
                 session_date: new Date().toISOString(),
             })
             .select()
             .single();
+
+        console.log("Insert data:", data);
+        console.log("Insert error:", error);
 
         if (error) {
             console.error('Error saving health session:', error);
@@ -113,7 +81,7 @@ export class DatabaseService {
         promptUsed: string,
         generatedLyrics: string,
         modelUsed: string = 'sonar-pro',
-    ): Promise<TherapyResponse | null> {
+    ) {
         const { data, error } = await supabase
             .from('therapy_responses')
             .insert({
@@ -132,79 +100,4 @@ export class DatabaseService {
 
         return data;
     }
-
-    // Get prompts that worked well for specific moods
-  async getSuccessfulPrompts(currentMood: string, desiredMood: string) {
-    const { data, error } = await supabase
-      .from('therapy_responses')
-      .select(`
-        prompt_used,
-        effectiveness_rating,
-        health_sessions!inner(current_mood, desired_mood)
-      `)
-      .eq('health_sessions.current_mood', currentMood)
-      .eq('health_sessions.desired_mood', desiredMood)
-      .gte('effectiveness_rating', 4)  // Only high-rated prompts
-      .order('effectiveness_rating', { ascending: false });
-    
-    if (error) throw error;
-    return data || [];
-  }
-
-  // Authentication methods
-  async signUp(email: string, password: string, userData: { name: string; age: number }) {
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: userData,
-      },
-    });
-
-    if (error) {
-      console.error('Error signing up:', error);
-      throw error;
-    }
-
-    return data;
-  }
-
-  async signIn(email: string, password: string) {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    if (error) {
-      console.error('Error signing in:', error);
-      throw error;
-    }
-
-    return data;
-  }
-
-  async signOut() {
-    const { error } = await supabase.auth.signOut();
-    
-    if (error) {
-      console.error('Error signing out:', error);
-      throw error;
-    }
-  }
-
-  async getCurrentUser() {
-    const { data: { user }, error } = await supabase.auth.getUser();
-    
-    if (error) {
-      console.error('Error getting current user:', error);
-      throw error;
-    }
-
-    return user;
-  }
-
-  // Session state management
-  onAuthStateChange(callback: (event: string, session: any) => void) {
-    return supabase.auth.onAuthStateChange(callback);
-  }
 }

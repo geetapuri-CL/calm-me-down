@@ -1,5 +1,5 @@
 import { useFocusEffect } from '@react-navigation/native';
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { View, TouchableOpacity, StyleSheet, Text, Button } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import { FitbitAuth } from '@/components/FitbitAuth';
@@ -25,25 +25,10 @@ export default function HomeScreen() {
   const [showHeartRateData, setShowHeartRateData] = useState(false);
   const [stepsData, setStepsData] = useState<any[]>([])
   const [locationData, setLocationData] = useState<Location.LocationObject | null>(null);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [authError, setAuthError] = useState<string | null>(null);
   const [dbService] = useState(() => new DatabaseService());
+  const [savedUser, setSavedUser] = useState<any>(null);
 
-  // Check authentication on mount
-  useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const user = await dbService.getCurrentUser();
-        if (user) {
-          setIsAuthenticated(true);
-        }
-      } catch (error) {
-        setIsAuthenticated(false);
-      }
-    };
 
-    checkAuth();
-  }, []);
 
   // Reset all app state
   const resetAppState = useCallback(() => {
@@ -174,14 +159,13 @@ export default function HomeScreen() {
     console.log('Heart rate data length:', heartRateData.length);
     console.log('Heart rate data sample:', JSON.stringify(heartRateData.slice(0, 1)));
     console.log('Resting HR sample:', heartRateData[0]?.value?.restingHeartRate);
-    console.log('Resting HR sample:', heartRateData[0].value.restingHeartRate);
-
+    console.log('Resting HR sample:', heartRateData[0]?.value?.restingHeartRate);
   }
   const analyzeHealthDataWithLLM = useCallback(async () => {
-      if (!heartRateData?.length || !stepsData?.length || !userData) {
-        setError('No health data or user data to analyze.');
-        return;
-  }
+    if (!heartRateData?.length || !stepsData?.length || !userData) {
+      setError('No health data or user data to analyze.');
+      return;
+    }
 
       const sampleHR = heartRateData[0].value.restingHeartRate;
       const sampleSteps = stepsData[0].value;
@@ -242,23 +226,27 @@ Keep the lyrics concise, around 200 words, and ensure they flow well together. A
       console.log('Generated Lyrics:', lyrics);
 
       //Save therapy response to Supabase with prompt
-      if (lyrics) {
-        // First save health session
-        const healthSession = await dbService.saveHealthSession({
-          heartRate: sampleHR,
-          steps: sampleSteps,
-          locationLat: locationData?.coords.latitude,
-          locationLon: locationData?.coords.longitude,
-          currentMood: userData.currentMood!,
-          desiredMood: userData.desiredMood!,
+      
+        try {
+     
+
+          // First save health session
+          const healthSession = await dbService.saveHealthSession({
+            userName: userData.name,
+            heartRate: sampleHR,
+            steps: sampleSteps,
+            locationLat: locationData?.coords.latitude,
+            locationLng: locationData?.coords.longitude,
+            currentMood: userData.currentMood!,
+            desiredMood: userData.desiredMood!,
         });
 
-        if (healthSession) {
+        if (lyrics && healthSession) {
           await dbService.saveTherapyResponse(
             healthSession.id,
-          prompt,
-          lyrics,
-          json_pplx.model
+            prompt,
+            lyrics,
+            json_pplx.model
         );
       }
 
@@ -269,11 +257,15 @@ Keep the lyrics concise, around 200 words, and ensure they flow well together. A
     } catch (e: any) {
       console.log('Error during LLM analysis or saving response:', e);
       setError(e.message || String(e));
-    } finally {
-      setAnalyzing(false);
-      console.log('Analysis complete');
+      } finally {
+        setAnalyzing(false);
+        console.log('Analysis complete');
+      }
+    } catch (e: any) {
+      console.log('Error during LLM analysis:', e);
+      setError(e.message || String(e));
     }
-  }, [heartRateData, stepsData, userData, locationData, savedUser]);
+  }, [heartRateData, stepsData, userData, locationData, dbService]);
 
   const handleLocationChange = (location: Location.LocationObject) => {
     console.log('Location updated:', location);
@@ -286,29 +278,7 @@ Keep the lyrics concise, around 200 words, and ensure they flow well together. A
   }, [locationData]); 
 
   
-  // Show authentication if not logged in
-  if (!isAuthenticated) {
-    return (
-      <ScrollView style={styles.container}
-        contentContainerStyle={{ padding: 6, paddingBottom: 48 }}
-        keyboardShouldPersistTaps="handled">
-        <AuthComponent
-          onAuthSuccess={(user) => {
-            console.log('Authentication successful:', user);
-            setIsAuthenticated(true);
-            setAuthError(null);
-          }}
-          onAuthError={(error) => {
-            console.error('Authentication error:', error);
-            setAuthError(error);
-          }}
-        />
-        {authError && (
-          <Text style={styles.errorText}>{authError}</Text>
-        )}
-      </ScrollView>
-    );
-  }
+
 
   return (
     <ScrollView style={styles.container}
