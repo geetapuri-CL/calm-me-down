@@ -7,6 +7,8 @@ import { HeartRateTable } from '@/components/HeartRateTable';
 import { ScrollView } from 'react-native';
 import { UserPrompts} from '@/components/UserPrompts';
 import { LocationService } from '@/components/LocationService';
+import { AuthComponent } from '@/components/AuthComponent';
+import { DatabaseService } from '@/lib/supabase';
 import * as Location from 'expo-location';
 
 const PPLX_API_KEY= process.env.EXPO_PUBLIC_PPLX_API_KEY;
@@ -23,7 +25,25 @@ export default function HomeScreen() {
   const [showHeartRateData, setShowHeartRateData] = useState(false);
   const [stepsData, setStepsData] = useState<any[]>([])
   const [locationData, setLocationData] = useState<Location.LocationObject | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [dbService] = useState(() => new DatabaseService());
 
+  // Check authentication on mount
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const user = await dbService.getCurrentUser();
+        if (user) {
+          setIsAuthenticated(true);
+        }
+      } catch (error) {
+        setIsAuthenticated(false);
+      }
+    };
+
+    checkAuth();
+  }, []);
 
   // Reset all app state
   const resetAppState = useCallback(() => {
@@ -185,7 +205,7 @@ export default function HomeScreen() {
 Current Health Status:
 - Heart Rate: ${sampleHR} BPM
 - Steps Today: ${sampleSteps.toLocaleString()} steps
-- Location: ${locationStr}
+${locationData ? `- Location: ${locationData.coords.latitude.toFixed(4)}, ${locationData.coords.longitude.toFixed(4)}` : ''}
 
 Emotional Journey:
 - Current Mood: ${userData.currentMood}
@@ -221,18 +241,39 @@ Keep the lyrics concise, around 200 words, and ensure they flow well together. A
       const lyrics = respJson.choices?.[0]?.message?.content;
       console.log('Generated Lyrics:', lyrics);
 
+      //Save therapy response to Supabase with prompt
+      if (lyrics) {
+        // First save health session
+        const healthSession = await dbService.saveHealthSession({
+          heartRate: sampleHR,
+          steps: sampleSteps,
+          locationLat: locationData?.coords.latitude,
+          locationLon: locationData?.coords.longitude,
+          currentMood: userData.currentMood!,
+          desiredMood: userData.desiredMood!,
+        });
+
+        if (healthSession) {
+          await dbService.saveTherapyResponse(
+            healthSession.id,
+          prompt,
+          lyrics,
+          json_pplx.model
+        );
+      }
+
       const output = lyrics ;
 
       setLlmResponse(output || 'No response from model.');
       console.log('LLM response:', output);
     } catch (e: any) {
-      console.log('Error during LLM analysis:', e);
+      console.log('Error during LLM analysis or saving response:', e);
       setError(e.message || String(e));
     } finally {
       setAnalyzing(false);
       console.log('Analysis complete');
     }
-  }, [heartRateData, stepsData, userData, locationData]);
+  }, [heartRateData, stepsData, userData, locationData, savedUser]);
 
   const handleLocationChange = (location: Location.LocationObject) => {
     console.log('Location updated:', location);
@@ -245,6 +286,30 @@ Keep the lyrics concise, around 200 words, and ensure they flow well together. A
   }, [locationData]); 
 
   
+  // Show authentication if not logged in
+  if (!isAuthenticated) {
+    return (
+      <ScrollView style={styles.container}
+        contentContainerStyle={{ padding: 6, paddingBottom: 48 }}
+        keyboardShouldPersistTaps="handled">
+        <AuthComponent
+          onAuthSuccess={(user) => {
+            console.log('Authentication successful:', user);
+            setIsAuthenticated(true);
+            setAuthError(null);
+          }}
+          onAuthError={(error) => {
+            console.error('Authentication error:', error);
+            setAuthError(error);
+          }}
+        />
+        {authError && (
+          <Text style={styles.errorText}>{authError}</Text>
+        )}
+      </ScrollView>
+    );
+  }
+
   return (
     <ScrollView style={styles.container}
       contentContainerStyle={{ padding: 6, paddingBottom: 48 }}
