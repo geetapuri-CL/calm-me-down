@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, Button, StyleSheet, TouchableOpacity } from 'react-native';
 
 interface UserPromptsProps {
-  onSubmit: (name: string, age: string, currentMood: string | null, desiredMood: string | null) => void;
+  onSubmit: (name: string, age: any, currentMood: string | null, desiredMood: string | null) => void;
 }
 
 export const UserPrompts: React.FC<UserPromptsProps> = ({ onSubmit }) => {

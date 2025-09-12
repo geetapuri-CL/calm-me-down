@@ -7,14 +7,14 @@ import { HeartRateTable } from '@/components/HeartRateTable';
 import { ScrollView } from 'react-native';
 import { UserPrompts} from '@/components/UserPrompts';
 import { LocationService } from '@/components/LocationService';
-import { AuthComponent } from '@/components/AuthComponent';
+//import { AuthComponent } from '@/components/AuthComponent';
 import { DatabaseService } from '@/lib/supabase';
 import * as Location from 'expo-location';
 
 const PPLX_API_KEY= process.env.EXPO_PUBLIC_PPLX_API_KEY;
 
 export default function HomeScreen() {
-  const [userData, setUserData] = useState<{name: string, age: string, currentMood: string | null, desiredMood: string | null} | null>(null);
+  const [userData, setUserData] = useState<{name: string, age: number, currentMood: string | null, desiredMood: string | null} | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [heartRateData, setHeartRateData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -171,11 +171,28 @@ export default function HomeScreen() {
       const sampleSteps = stepsData[0].value;
       setHRsample(sampleHR);
 
-      const locationStr = locationData ?
-        `My current location is Lat: ${locationData.coords.latitude.toFixed(4)}, Lng: ${locationData.coords.longitude.toFixed(4)}.` :
-        'Location data not available.';
+      // First save health session
+      const healthSession = await dbService.saveHealthSession({
+        userName: userData.name,
+        userAge: userData.age,
+        heartRate: sampleHR,
+        steps: sampleSteps,
+        locationLat: locationData?.coords.latitude,
+        locationLng: locationData?.coords.longitude,
+        currentMood: userData.currentMood!,
+        desiredMood: userData.desiredMood!,
+    });
 
-      console.log('Analyzing health data with LLM...');
+    const USE_MOCK_DATA = true;
+    let lyrics:string;
+    
+    
+
+    const locationStr = locationData ?
+      `My current location is Lat: ${locationData.coords.latitude.toFixed(4)}, Lng: ${locationData.coords.longitude.toFixed(4)}.` :
+      'Location data not available.';
+
+      console.log('Analyzing health data with LLM for test...');
       console.log(`Using health data: ${sampleHR} BPM, ${sampleSteps.toLocaleString()} steps`);
       console.log('User data:', userData);
       console.log(locationStr);
@@ -186,17 +203,17 @@ export default function HomeScreen() {
     try {
       const prompt = `Hi, I'm ${userData.name}, ${userData.age} years old. 
 
-Current Health Status:
-- Heart Rate: ${sampleHR} BPM
-- Steps Today: ${sampleSteps.toLocaleString()} steps
-${locationData ? `- Location: ${locationData.coords.latitude.toFixed(4)}, ${locationData.coords.longitude.toFixed(4)}` : ''}
+      Current Health Status:
+      - Heart Rate: ${sampleHR} BPM
+      - Steps Today: ${sampleSteps.toLocaleString()} steps
+      ${locationData ? `- Location: ${locationData.coords.latitude.toFixed(4)}, ${locationData.coords.longitude.toFixed(4)}` : ''}
 
-Emotional Journey:
-- Current Mood: ${userData.currentMood}
-- Desired Mood: ${userData.desiredMood}
+      Emotional Journey:
+      - Current Mood: ${userData.currentMood}
+      - Desired Mood: ${userData.desiredMood}
 
-Please generate personalized, meaningful lyrics for a song that will help me transition from feeling ${userData.currentMood} to feeling ${userData.desiredMood}. Consider my health statistics (heart rate and activity level) when crafting the lyrics. The song should be motivational and therapeutic, helping me reach my desired emotional state through music. Make it personal and relatable to my current physical and emotional state. 
-Keep the lyrics concise, around 200 words, and ensure they flow well together. Avoid generic phrases and focus on creating a unique piece that resonates with my situation and location. Thank you!`;
+      Please generate personalized, meaningful lyrics for a song that will help me transition from feeling ${userData.currentMood} to feeling ${userData.desiredMood}. Consider my health statistics (heart rate and activity level) when crafting the lyrics. The song should be motivational and therapeutic, helping me reach my desired emotional state through music. Make it personal and relatable to my current physical and emotional state. 
+      Keep the lyrics concise, around 200 words, and ensure they flow well together. Avoid generic phrases and focus on creating a unique piece that resonates with my situation and location. Thank you!`;
 
       const json_pplx = {
         "model": "sonar-pro",
@@ -206,7 +223,11 @@ Keep the lyrics concise, around 200 words, and ensure they flow well together. A
         "max_tokens": 300,
         "temperature": 0.8
       }
-
+      
+      if (USE_MOCK_DATA) {
+        lyrics = 'testing for mock lyrics';
+        console.log ("Using mock lyrics for testing")
+      } else {
       const resp = await fetch(
         'https://api.perplexity.ai/chat/completions',
         {
@@ -222,25 +243,12 @@ Keep the lyrics concise, around 200 words, and ensure they flow well together. A
       const respJson = await resp.json();
 
       // Extract the lyrics output (usually here)
-      const lyrics = respJson.choices?.[0]?.message?.content;
-      console.log('Generated Lyrics:', lyrics);
-
+      lyrics = respJson.choices?.[0]?.message?.content;
+      console.log('Generated Lyrics using LLM/API response:', lyrics);
+    }
       //Save therapy response to Supabase with prompt
       
-        try {
-     
-
-          // First save health session
-          const healthSession = await dbService.saveHealthSession({
-            userName: userData.name,
-            heartRate: sampleHR,
-            steps: sampleSteps,
-            locationLat: locationData?.coords.latitude,
-            locationLng: locationData?.coords.longitude,
-            currentMood: userData.currentMood!,
-            desiredMood: userData.desiredMood!,
-        });
-
+    try {
         if (lyrics && healthSession) {
           await dbService.saveTherapyResponse(
             healthSession.id,
@@ -357,7 +365,7 @@ Keep the lyrics concise, around 200 words, and ensure they flow well together. A
           <Text style={styles.stepTitle}>Step 4: Generate Personalized Lyrics</Text>
           <Button
             title={analyzing ? 'Generating Lyrics…' : 'Generate Lyrics'}
-            //onPress={analyzeHealthDataWithLLM} //uncomment this to call , comment so you dont waste money :D
+            onPress={analyzeHealthDataWithLLM} //uncomment this to call , comment so you dont waste money :D
             disabled={analyzing || loading}
           />
         </View>

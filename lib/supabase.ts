@@ -41,6 +41,7 @@ export class DatabaseService {
     // Health session management
     async saveHealthSession(sessionData: {
         userName: string;
+        userAge: number;
         heartRate: number;
         steps: number;
         locationLat?: number;
@@ -53,7 +54,8 @@ export class DatabaseService {
         const { data, error } = await supabase
             .from('health_sessions')
             .insert({
-                user_id: sessionData.userName,
+                user_name: sessionData.userName,
+                user_age: sessionData.userAge,
                 heart_rate: sessionData.heartRate,
                 steps: sessionData.steps,
                 location_lat: sessionData.locationLat,
@@ -81,6 +83,7 @@ export class DatabaseService {
         promptUsed: string,
         generatedLyrics: string,
         modelUsed: string = 'sonar-pro',
+        
     ) {
         const { data, error } = await supabase
             .from('therapy_responses')
