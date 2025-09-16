@@ -137,4 +137,40 @@ export class DatabaseService {
         
         return data || [];
     }
+
+    async saveRollingHeartMeasurement(sessionID: string, heartRate: number) {
+        const {data, error} = await supabase
+            .from ('rolling_heart_rate')
+            .insert ({
+                session_id: sessionID,
+                heart_rate: heartRate,
+                measured_at: new Date().toISOString(),
+            })
+            .select()
+            .single();
+
+        if (error) {
+            console.log ("Error saving rolling heart rate measurement:", error);
+            throw error;
+        }
+        return data;
+    }
+
+    async saveRollingStepsMeasurement(sessionID: string, heartRate: number) {
+        const {data, error} = await supabase
+            .from ('rolling_steps')
+            .insert ({
+                session_id: sessionID,
+                steps: heartRate,
+                measured_at: new Date().toISOString(),
+            })
+            .select()
+            .single();
+
+        if (error) {
+            console.log ("Error saving rolling steps measurement:", error);
+            throw error;
+        }
+        return data;
+    }
 }

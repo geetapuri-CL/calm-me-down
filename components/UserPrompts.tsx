@@ -20,7 +20,7 @@ export const UserPrompts: React.FC<UserPromptsProps> = ({ onSubmit }) => {
   useEffect(() => {
     const valid = !!(name && age && currentMood && desiredMood);
     setIsFormValid(valid);
-    console.log('Form state changed:', {name, age, currentMood, desiredMood, disabled: !valid, isFormValid: valid});
+    //console.log('Form state changed:', {name, age, currentMood, desiredMood, disabled: !valid, isFormValid: valid});
   }, [name, age, currentMood, desiredMood]);
   return (
     <View style={styles.container}>
@@ -49,7 +49,7 @@ export const UserPrompts: React.FC<UserPromptsProps> = ({ onSubmit }) => {
               currentMood === tag && styles.selectedTag
             ]}
             onPress={() => {
-              console.log('Current mood selected:', tag);
+              //console.log('Current mood selected:', tag);
               setCurrentMood(tag);
             }}
           >
@@ -67,7 +67,7 @@ export const UserPrompts: React.FC<UserPromptsProps> = ({ onSubmit }) => {
               desiredMood === tag && styles.selectedTag
             ]}
             onPress={() => {
-              console.log('Desired mood selected:', tag);
+              //console.log('Desired mood selected:', tag);
               setDesiredMood(tag);
             }}
           >

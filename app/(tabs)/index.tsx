@@ -1,5 +1,5 @@
 import { useFocusEffect } from '@react-navigation/native';
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { View, TouchableOpacity, StyleSheet, Text, Button } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import { FitbitAuth } from '@/components/FitbitAuth';
@@ -10,6 +10,9 @@ import { LocationService } from '@/components/LocationService';
 //import { AuthComponent } from '@/components/AuthComponent';
 import { DatabaseService } from '@/lib/supabase';
 import * as Location from 'expo-location';
+import {IconButton } from 'react-native-paper'
+import { Audio } from 'expo-av'
+
 
 const PPLX_API_KEY= process.env.EXPO_PUBLIC_PPLX_API_KEY;
 
@@ -27,7 +30,10 @@ export default function HomeScreen() {
   const [locationData, setLocationData] = useState<Location.LocationObject | null>(null);
   const [dbService] = useState(() => new DatabaseService());
   const [savedUser, setSavedUser] = useState<any>(null);
-
+  const soundRef = useRef<Audio.Sound | null>(null);
+  const [songReady, setSongReady] = useState(false);
+  const intervalRef = useRef<number | null>(null);
+  const [sessionID, setSessionID] = useState<string | null >(null);
 
 
   // Reset all app state
@@ -42,6 +48,7 @@ export default function HomeScreen() {
     setAnalyzing(false);
     setLlmResponse('');
     setHRsample(0);
+    setSongReady(false);
     // Don't reset location data - keep it persistent
     // setLocationData(null);
   }, []);
@@ -54,14 +61,35 @@ export default function HomeScreen() {
 
       return () => {
         console.log('Home tab unfocused');
+        if (soundRef.current) {
+          soundRef.current.stopAsync();
+          soundRef.current.unloadAsync();
+          soundRef.current = null;
+        }
       }
     }, [resetAppState])
   );
 
-  const fetchHealthData = async () => {
+  useEffect (() => {
+    return () => {
+      if (soundRef.current) {
+        soundRef.current.stopAsync();
+        soundRef.current.unloadAsync();
+        soundRef.current = null;
+      }
+
+      stopPolling();
+    
+    };
+  }, []);
+
+  const fetchHealthData = async ({saveToDB,sessionID} : {saveToDB?: boolean | null, sessionID?:string | null} = {}) => {
     if (!token) {
       console.log('No token available for API calls');
       return;
+    }
+    if (!saveToDB && !sessionID) {
+      console.log("No session id and no saveToDB present")
     }
 
     console.log('Starting health data fetch with token:', token.substring(0, 20) + '...');
@@ -131,6 +159,13 @@ export default function HomeScreen() {
         console.log(`Date: ${entry.dateTime}, Resting HR: ${entry.value.restingHeartRate}`);
         entry.value.restingHeartRate = 120; // Your test HR value
       });
+      let latestHR = 
+        hrData.length > 0 
+        ? hrData[hrData.length -1].value.restingHeartRate
+        : null;
+
+      //mock
+      latestHR = 120
 
       // Process steps data
       const stepsData = fitbitStepsData['activities-steps'] || [];
@@ -138,6 +173,13 @@ export default function HomeScreen() {
         console.log(`Date: ${entry.dateTime}, Steps: ${entry.value}`);
         entry.value = 3000; // your test steps value
       });
+      let latestSteps = 
+        stepsData.lentgh > 0
+        ? stepsData[stepsData.length -1].value
+        : null;
+
+      //mock 
+      latestSteps = 3000;
 
       setHeartRateData(hrData);
       setStepsData(stepsData);
@@ -145,6 +187,12 @@ export default function HomeScreen() {
       
       console.log("Heart rate data length:", hrData.length);
       console.log("Steps data length:", stepsData.length);
+
+      if (saveToDB && sessionID){
+        console.log("fetch and save HR and steps")
+        await dbService.saveRollingHeartMeasurement(sessionID, latestHR)
+        await dbService.saveRollingStepsMeasurement(sessionID, latestSteps)
+      }
       
     } catch (e: any) {
       setError(e.message);
@@ -181,10 +229,12 @@ export default function HomeScreen() {
         locationLng: locationData?.coords.longitude,
         currentMood: userData.currentMood!,
         desiredMood: userData.desiredMood!,
-    });
+      });
+      setSessionID(healthSession.id);
 
-    const USE_MOCK_DATA = true;
+    const USE_MOCK_LYRICS = true;
     let lyrics:string;
+    let song_path: string;
     
     
 
@@ -224,9 +274,13 @@ export default function HomeScreen() {
         "temperature": 0.8
       }
       
-      if (USE_MOCK_DATA) {
+      if (USE_MOCK_LYRICS) {
         lyrics = 'testing for mock lyrics';
+        song_path = ''
         console.log ("Using mock lyrics for testing")
+        console.log ("Using mock song for test")
+        
+
       } else {
       const resp = await fetch(
         'https://api.perplexity.ai/chat/completions',
@@ -246,10 +300,18 @@ export default function HomeScreen() {
       lyrics = respJson.choices?.[0]?.message?.content;
       console.log('Generated Lyrics using LLM/API response:', lyrics);
     }
+
+    //call play song here, after fetching the lyrics (or song in future)
+    // when song is fetched with api, we will store and play (or find another mechanism)
+    // for now, dummy song
+
+    setSongReady(true);
+    //playSong();
       //Save therapy response to Supabase with prompt
       
     try {
         if (lyrics && healthSession) {
+          console.log("Calling DB service")
           await dbService.saveTherapyResponse(
             healthSession.id,
             prompt,
@@ -282,10 +344,47 @@ export default function HomeScreen() {
 
   // Debug: Log when location data changes
   React.useEffect(() => {
-    console.log('Location data state changed:', locationData);
+    //console.log('Location data state changed:', locationData);
   }, [locationData]); 
 
-  
+  const playSong = async () => {
+    if (soundRef.current === null ){
+      const { sound } = await Audio.Sound.createAsync(
+        require('/Users/geetapuri/phd/SUTD/2025/Sep2025_Term3/Agentic-diffrhythm/src/cmd/assets/music/PTASJO_-_Renaissance.mp3') );// Use a file or a remote URL
+      soundRef.current = sound;
+    }  
+    console.log("inside playsong")
+    await soundRef.current.playAsync();
+    startPolling();
+  };
+
+  const pauseSong = async () => {
+    if (soundRef.current) {
+      await soundRef.current.pauseAsync();
+      stopPolling();
+    }
+    console.log("Paused song")
+  };
+
+  const restartSong = async () => {
+    if (soundRef.current) {
+      await soundRef.current.setPositionAsync(0);
+      await soundRef.current.playAsync();
+    }
+  };
+
+  const startPolling = () => {
+    console.log("inside start polling")
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    intervalRef.current = setInterval (() => {
+      fetchHealthData({saveToDB: true, sessionID: sessionID ?? null});
+    }, 10000);
+  };
+
+  const stopPolling = () => {
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    intervalRef.current = null;
+  }
 
 
   return (
@@ -326,7 +425,7 @@ export default function HomeScreen() {
       {userData && token && (
         <View style={styles.stepContainer}>
           <Text style={styles.stepTitle}>Step 3: Get Health Data</Text>
-          <TouchableOpacity style={styles.iconButton} onPress={fetchHealthData} disabled={loading || analyzing}>
+          <TouchableOpacity style={styles.iconButton} onPress={() => fetchHealthData()} disabled={loading || analyzing}>
             <FontAwesome name="heart" size={64} color={loading ? 'orange' : 'red'} />
           </TouchableOpacity>
           <Text style={styles.stepDescription}>Tap the heart to fetch your health data (heart rate & steps)</Text>
@@ -359,15 +458,30 @@ export default function HomeScreen() {
         </View>
       )}
 
-      {/* Step 4: Generate Lyrics */}
+      {/* Step 4: Generate Lyrics or Song */}
       {userData && heartRateData.length > 0 && stepsData.length > 0 && (
         <View style={styles.stepContainer}>
-          <Text style={styles.stepTitle}>Step 4: Generate Personalized Lyrics</Text>
-          <Button
-            title={analyzing ? 'Generating Lyrics…' : 'Generate Lyrics'}
-            onPress={analyzeHealthDataWithLLM} //uncomment this to call , comment so you dont waste money :D
-            disabled={analyzing || loading}
-          />
+          <Text style={styles.stepTitle}>Step 4: Generate Personalized Song</Text>
+          {!songReady && (
+            <Button
+              title={analyzing ? 'Generating Song…' : 'Generate Song'}
+              onPress={analyzeHealthDataWithLLM} //uncomment this to call , comment so you dont waste money :D
+              disabled={analyzing || loading}
+            />
+          )}
+          {songReady && (
+            <View style={{ flexDirection: 'row', justifyContent: 'center' }}>
+            <IconButton icon="play" onPress={playSong} iconColor='green' containerColor='white' />
+            <IconButton icon="pause" onPress={pauseSong} iconColor='orange' containerColor='white' />
+            <IconButton icon="restart" onPress={restartSong}iconColor='blue' containerColor='white' />
+          </View>
+
+          )}
+
+          
+          <Text style={styles.statusText}>
+            {songReady ? "Press the button to to play song" : "Presss Generate Song to create your personalized music"} </Text>
+
         </View>
       )}
 
