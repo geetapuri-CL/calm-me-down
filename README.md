@@ -18,6 +18,7 @@ A personalized wellness app that generates therapeutic lyrics based on your mood
 - Expo CLI
 - iOS Simulator (Mac) or Android emulator
 - Fitbit Developer Account
+- Supabase Account (PostgreSQL backend)
 
 ### Installation
 
@@ -35,21 +36,24 @@ npm install
    FITBIT_CLIENT_ID=your_fitbit_client_id
    FITBIT_CLIENT_SECRET=your_fitbit_client_secret
    PERPLEXITY_API_KEY=your_perplexity_api_key
+   EXPO_PUBLIC_SUPABASE_URL=your_supabase_url
+   EXPO_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 
 4. **Start the development server**
 npx expo start -c
 
 5. **Run on Device**
-Scan QR code (expo go) / npm run ios / npm run android
+Scan QR code (expo go) / npm run ios / npm run android 
 
 6. ## 📱 App Flow
 
 1. **User Input**: Enter name, age, current mood, and desired mood
 2. **Fitbit Authorization**: Connect and authorize Fitbit access (if not already done)
 3. **Health Data Collection**: Fetch heart rate and activity data
-4. **Lyrics Generation**: AI creates personalized therapeutic lyrics based on your data
-5. **TODO**: AI generates song
-6. **TODO**: Reassess health stats
+4. **Personalized Generation**: AI creates personalized therapeutic lyrics / song based on your data
+5. **Live Polling**: While music plays, HR and steps are automatically recorded and saved every 10s with timestamps for analytics
+6. **Feedback**: When a session ends, users can rate the song's effect, linking feedback to their physiological data7
+7. **Personal Analytics**: View graphs and stats in the dedicated analytics tab, plotting HR/steps against music and mood shifts
 
 ## 🛠️ Tech Stack
 
@@ -58,21 +62,39 @@ Scan QR code (expo go) / npm run ios / npm run android
 - **APIs**: Fitbit Web API, Perplexity AI API SONAR
 - **Storage**: AsyncStorage for token management
 - **Navigation**: Expo Router (if applicable)
-- **Backend**: TODO
+- **Backend**: Supabase (PostgreSQL) — for session, HR, steps, feedback, and lyrics storage
+- **Charts/Analytics**: react-native-gifted-charts 
 
 ## 📂 Project Structure
 cmd/
 ├── app/
-│ └── index.tsx # Main HomeScreen component
+│   ├── (tabs)/
+│   │   ├── index.tsx           # Home tab
+│   │   ├── explore.tsx         # Explore tab
+│   │   ├── analytics.tsx       # Platform Analytics tab
+│   │   └── cmd-effect.tsx      # Personal Analytics tab
+│   └── ...
 ├── components/
-│ ├── FitbitAuth.tsx # Fitbit OAuth implementation
-│ ├── UserPrompts.tsx # User input form
-│ └── HeartRateTable.tsx # Health data display
-├── assets/ # Images, fonts, etc.
-├── .env.example # Environment variables template
+│   ├── FitbitAuth.tsx
+│   ├── UserPrompts.tsx
+│   ├── HeartRateTable.tsx
+│   └── ... (UI, analytics, etc.)
+├── assets/                     # Images, fonts, etc.
+├── lib/
+│   ├── supabase.ts             # Supabase client & DBService
+├── .env.example                # Environment variables template
 └── README.md
 
 - **Main files so far** 
+
+🗄️ Database Model (Supabase)
+- health_sessions: user, mood/context, initial HR and steps, session date
+
+- rolling_heart_rate: all polled HR values per session (timestamped)
+
+- rolling_steps: all polled Steps per session (timestamped)
+
+- therapy_responses: lyrics, feedback, AI output per session
 
 ## 🔧 Configuration
 
@@ -82,6 +104,12 @@ cmd/
 2. Set application type to "Client"
 3. Configure OAuth 2.0 settings with your redirect URI
 4. Add your client ID and secret to `.env.local`
+5. Grant required scopes (heartrate, activity, profile, etc.)
+
+Supabase Setup
+1. Create a project at supabase.com
+2. Set up tables with your provided schema
+3. Add EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY to .env.local
 
 ### Required Scopes
 
@@ -94,10 +122,18 @@ The app requests these Fitbit permissions:
 - `nutrition` - Nutrition data
 - `settings` - User settings
 
+📊 Analytics Tab
+- Dedicated tabs for both platform-wide and personal analytics
+
+- Graphs show HR and steps changes over the course of music sessions
+
+- Analyze the effect of personalized music on user’s health metrics over time
+
 ## 🙏 Acknowledgments
 
 - Fitbit Web API for health data integration
 - Perplexity AI for natural language generation
 - Expo team for the amazing development platform
+- Supabase for backend session/biometric/feedback storage
 
 Made with ❤️ for mental wellness and music therapy
