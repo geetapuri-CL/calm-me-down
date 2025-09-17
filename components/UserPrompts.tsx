@@ -4,10 +4,19 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, Button, StyleSheet, TouchableOpacity } from 'react-native';
 
 interface UserPromptsProps {
-  onSubmit: (name: string, age: any, currentMood: string | null, desiredMood: string | null) => void;
+  onSubmit?: (name: string, age: any, currentMood: string | null, desiredMood: string | null) => void;
+  userData?: {
+    name: string;
+    age: number;
+    currentMood: string | null;
+    desiredMood: string | null;
+  } | null;
+  onClose?: () => void;
+  sessionID? : string | null;
+  onSubmitFeedback?:(sessionID: string, feedbackMood: string, comments?: string) => void;
 }
 
-export const UserPrompts: React.FC<UserPromptsProps> = ({ onSubmit }) => {
+export const UserPrompts: React.FC<UserPromptsProps> = ({ onSubmit, userData, onClose, sessionID, onSubmitFeedback }) => {
   const [name, setName] = useState('');
   const [age, setAge] = useState('');
   const [fitnessLevel, setFitnessLevel] = useState('');
@@ -15,6 +24,40 @@ export const UserPrompts: React.FC<UserPromptsProps> = ({ onSubmit }) => {
   const [currentMood, setCurrentMood] = useState<string | null>(null);
   const [desiredMood, setDesiredMood] = useState<string | null>(null);
   const [isFormValid, setIsFormValid] = useState(false);
+  const [selectedMood, setSelectedMood] = useState<string | null>(null);
+
+  if (userData) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.label}>
+          You were feeling <Text style={{fontWeight:'bold'}}>{userData.currentMood}</Text>, wanted to feel <Text style={{fontWeight:'bold'}}>{userData.desiredMood}</Text>.
+          {"\n"}How do you feel now?
+        </Text>
+        <View style={styles.tagContainer}>
+          {moodTags.map(tag => (
+            <TouchableOpacity
+              key={tag}
+              style={[styles.tag, selectedMood === tag && styles.selectedTag]}
+              onPress={() => setSelectedMood(tag)}
+            >
+              <Text>{tag}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        <TouchableOpacity
+          style={[styles.submitButton, { backgroundColor: selectedMood ? "#007AFF" : "#666" }]}
+          onPress={async () => {
+            if (selectedMood && onSubmitFeedback && sessionID) {
+              await onSubmitFeedback(sessionID, selectedMood);
+              if (onClose) onClose();
+            }
+          }}
+          disabled={!selectedMood} >
+          <Text style={styles.submitButtonText}>Submit</Text>
+        </TouchableOpacity>
+        </View>
+    );
+  }
 
   // Update form validity when any field changes
   useEffect(() => {
@@ -81,7 +124,11 @@ export const UserPrompts: React.FC<UserPromptsProps> = ({ onSubmit }) => {
           styles.submitButton,
           { backgroundColor: isFormValid ? "#007AFF" : "#666" }
         ]}
-        onPress={() => isFormValid && onSubmit(name, age, currentMood, desiredMood)}
+        onPress={() => {
+          if (isFormValid && onSubmit) {
+            onSubmit(name, age, currentMood, desiredMood);
+          }
+        }}
         disabled={!isFormValid}
       >
         <Text style={styles.submitButtonText}>Submit</Text>

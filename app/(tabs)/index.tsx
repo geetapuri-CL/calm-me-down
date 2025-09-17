@@ -11,7 +11,8 @@ import { LocationService } from '@/components/LocationService';
 import { DatabaseService } from '@/lib/supabase';
 import * as Location from 'expo-location';
 import {IconButton } from 'react-native-paper'
-import { Audio } from 'expo-av'
+import { Audio, AVPlaybackStatusError } from 'expo-av'
+import { AVPlaybackStatus } from 'expo-av';
 
 
 const PPLX_API_KEY= process.env.EXPO_PUBLIC_PPLX_API_KEY;
@@ -34,6 +35,8 @@ export default function HomeScreen() {
   const [songReady, setSongReady] = useState(false);
   const intervalRef = useRef<number | null>(null);
   const [sessionID, setSessionID] = useState<string | null >(null);
+  const [pollCount, setPollCount] = useState(0)
+  const [canShowFeedback, setCanShowFeedback] = useState(false);
 
 
   // Reset all app state
@@ -49,6 +52,8 @@ export default function HomeScreen() {
     setLlmResponse('');
     setHRsample(0);
     setSongReady(false);
+    setCanShowFeedback(false);
+    setPollCount(0);
     // Don't reset location data - keep it persistent
     // setLocationData(null);
   }, []);
@@ -348,12 +353,15 @@ export default function HomeScreen() {
   }, [locationData]); 
 
   const playSong = async () => {
+    console.log("inside playsong")
     if (soundRef.current === null ){
       const { sound } = await Audio.Sound.createAsync(
         require('/Users/geetapuri/phd/SUTD/2025/Sep2025_Term3/Agentic-diffrhythm/src/cmd/assets/music/PTASJO_-_Renaissance.mp3') );// Use a file or a remote URL
       soundRef.current = sound;
+      soundRef.current.setOnPlaybackStatusUpdate(onPlaybackStatusUpdate);
+      console.log("status update from setOnPlaybackStatusUpdate - ", soundRef.current.setOnPlaybackStatusUpdate(onPlaybackStatusUpdate) )
     }  
-    console.log("inside playsong")
+    
     await soundRef.current.playAsync();
     startPolling();
   };
@@ -374,18 +382,39 @@ export default function HomeScreen() {
   };
 
   const startPolling = () => {
+    
     console.log("inside start polling")
+    setPollCount(0);
     if (intervalRef.current) clearInterval(intervalRef.current);
     intervalRef.current = setInterval (() => {
       fetchHealthData({saveToDB: true, sessionID: sessionID ?? null});
+      setPollCount (prev => {
+        const newCount = prev +1;
+        if (newCount >=3) setCanShowFeedback(true);
+        return newCount;
+      });
     }, 10000);
   };
 
   const stopPolling = () => {
+    console.log("Inside stop polling")
     if (intervalRef.current) clearInterval(intervalRef.current);
     intervalRef.current = null;
+    console.log("Polled for ", pollCount, "times")
   }
 
+  const onPlaybackStatusUpdate = (status: AVPlaybackStatus)=> {
+    if (status.isLoaded) {
+      if (status.didJustFinish && !status.isLooping && !canShowFeedback) {
+        stopPolling();
+        setCanShowFeedback(true); // Always prompt when finished
+      }
+    } else {
+      console.log("Audio playback error: ", (status as AVPlaybackStatusError).error);
+    }
+
+  
+};
 
   return (
     <ScrollView style={styles.container}
@@ -483,6 +512,19 @@ export default function HomeScreen() {
             {songReady ? "Press the button to to play song" : "Presss Generate Song to create your personalized music"} </Text>
 
         </View>
+      )}
+
+      {canShowFeedback && (
+        <View style={styles.infoText}>
+          <Text >Step 5: How do you feel now? </Text>
+          <UserPrompts
+            userData = {userData}
+            sessionID = {sessionID}
+            onSubmitFeedback={(sessionID, mood) => dbService.saveMoodFeedback(sessionID, mood)}
+            onClose = {() => setCanShowFeedback(false)}
+            />
+        </View> 
+          
       )}
 
       {analyzing && <Text style={styles.statusText}>Generating personalized lyrics...</Text>}

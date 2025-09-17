@@ -173,4 +173,25 @@ export class DatabaseService {
         }
         return data;
     }
+
+    async saveMoodFeedback (sessionID: string, feedbackMood: string, comments?:string) {
+        const {data, error} = await supabase
+            .from ('mood_feedback')
+            .insert ({
+                session_id : sessionID,
+                feedback_mood: feedbackMood,
+                feedback_time : new Date().toISOString(),
+                comments: comments || null,
+            })
+            .select()
+            .single();
+
+        if (error) {
+            console.log ("Error saving mood feedback: ", error)
+            throw error;
+        }
+
+        return data;
+
+    }
 }
