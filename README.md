@@ -19,6 +19,7 @@ A personalized wellness app that generates therapeutic lyrics based on your mood
 - iOS Simulator (Mac) or Android emulator
 - Fitbit Developer Account
 - Supabase Account (PostgreSQL backend)
+- for IOS -> npx expo prebuild
 
 ### Installation
 

@@ -156,6 +156,9 @@ export class DatabaseService {
         return data;
     }
 
+    async getRollingHeartRate(){}
+    async getRollingSteps(){}
+
     async saveRollingStepsMeasurement(sessionID: string, heartRate: number) {
         const {data, error} = await supabase
             .from ('rolling_steps')

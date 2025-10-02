@@ -13,6 +13,8 @@ import * as Location from 'expo-location';
 import {IconButton } from 'react-native-paper'
 import { Audio, AVPlaybackStatusError } from 'expo-av'
 import { AVPlaybackStatus } from 'expo-av';
+//import { AppleHealthAuth } from '@/components/AppleHealthAuth'
+import AppleHealthShow from '@/components/AppleHealthUI';
 
 
 const PPLX_API_KEY= process.env.EXPO_PUBLIC_PPLX_API_KEY;
@@ -423,6 +425,9 @@ export default function HomeScreen() {
 
       {/* Location Service - Always active */}
       <LocationService onLocationChange={handleLocationChange} />
+
+      {/* Additional step to add Apple Health Authorization */}
+      <AppleHealthShow />
 
       {/* Step 1: User Prompts */}
       {!userData && (
